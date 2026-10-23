@@ -1,13 +1,19 @@
 package com.example.habittracker.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 /**
- * Data class representando uma conquista/recompensa.
- * Usada na tela de recompensas e na tela de detalhes da conquista.
+ * Entity Room representando uma conquista.
+ * Vira a tabela "conquistas" no banco SQLite.
  */
+@Entity(tableName = "conquistas")
 data class Conquista(
-    val id: Int,
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+
     val titulo: String,
-    val descricao: String,
-    var desbloqueada: Boolean = false,
+    val descricao: String = "",
+    val desbloqueada: Boolean = false,
     val icone: String = "🏅"
 )

@@ -1,34 +1,44 @@
-# HabitTracker - Trabalho 2
+# HabitTracker - Trabalho 3 (Persistência com Room)
 
-Aplicativo Android individual de rastreamento de hábitos diários com gamificação, desenvolvido em Kotlin com Jetpack Compose.
+Aplicativo Android individual de rastreamento de hábitos diários, evoluído para suportar persistência de dados local via Room (SQLite).
 
 ## Integrante
 - Marcio Henrique
 
 ## Funcionalidades Implementadas
-- ✅ Lista de hábitos com `LazyColumn` e toggle de conclusão
-- ✅ Adicionar novo hábito via formulário (nome, descrição, dias da semana)
-- ✅ Lista de conquistas com toggle de desbloqueio
-- ✅ Tela de detalhes do hábito com estatísticas calculadas e barra de progresso (complexidade extra)
-- ✅ Tela de detalhes da conquista
-- ✅ Navegação com BottomBar (3 abas) + NavHost centralizado
-- ✅ Botão de voltar funcional (`popBackStack`) em telas secundárias
-- ✅ 7 telas navegáveis no total
-- ✅ 2 Data Classes (`Habito`, `Conquista`) com estado reativo via `mutableStateListOf`
+### CRUD Completo de Hábitos
+- ✅ Criar novo hábito (nome, descrição, dias da semana)
+- ✅ Listar hábitos do banco (LazyColumn)
+- ✅ Editar hábito existente (tela separada)
+- ✅ Deletar hábito (botão lixeira)
+- ✅ Marcar/desmarcar conclusão (persistido)
 
-## Tecnologias Utilizadas
-- Kotlin
-- Jetpack Compose
-- Navigation Compose (`NavHost`, `NavController`, `Rotas`)
-- ViewModel + `mutableStateListOf`
+### CRUD Completo de Conquistas
+- ✅ Criar nova conquista (título, descrição)
+- ✅ Listar conquistas do banco (LazyColumn)
+- ✅ Editar conquista existente (tela separada)
+- ✅ Deletar conquista (botão lixeira)
+- ✅ Marcar/desmarcar desbloqueio (persistido)
+
+### Navegação e Detalhes
+- ✅ BottomNavigationBar com 3 abas principais
+- ✅ Tela de detalhes do hábito busca dados direto do banco pelo ID
+- ✅ Complexidade extra: taxa de conclusão calculada + barra de progresso visual
+- ✅ Botão voltar funcional em todas as telas secundárias
+
+## Tecnologias
+- Kotlin + Jetpack Compose (Material 3)
+- Navigation Compose
+- Room (SQLite) + KSP
+- ViewModel + Coroutines (Dispatchers.IO)
 - Android Studio
 
 ## Como Rodar o Projeto
 
 ### Pré-requisitos
-- Android Studio Hedgehog (ou superior)
-- JDK 17
-- Emulador Android (API 24+) ou dispositivo físico com USB debugging ativado
+- Android Studio Hedgehog ou superior
+- JDK 17 (configurado no Gradle Settings)
+- Emulador API 24+ ou dispositivo físico
 
 ### Passo a Passo
 1. Clone o repositório:
@@ -36,48 +46,36 @@ Aplicativo Android individual de rastreamento de hábitos diários com gamifica�
    git clone https://github.com/mhenriqueof/aplicativos-moveis-projeto-A2.git
    ```
 
-2. Abra o projeto no Android Studio (`File > Open`).
+2. Abra no Android Studio e aguarde o Sync do Gradle.
 
-3. Aguarde o Gradle sincronizar as dependências automaticamente.
+3. Execute o app (▶️ Run).
 
-4. Selecione um emulador configurado ou conecte um dispositivo físico.
+4. **Teste de Persistência:** Adicione um hábito → feche o app → abra novamente → verifique se o hábito continua lá.
 
-5. Clique em **Run 'app'** (▶️) ou pressione `Shift + F10`.
-
-## Estrutura do Projeto
+## Estrutura do Código
 ```
 app/src/main/java/com/example/habittracker/
-├── data/model/          # Data classes (Habito.kt, Conquista.kt)
-├── navigation/          # Rotas.kt, AppNavigation.kt
-├── ui/screens/          # Telas Compose (Home, NovoHabito, Recompensas, etc.)
-├── ui/viewmodel/        # HabitViewModel.kt (estado compartilhado)
-└── MainActivity.kt      # Entry point do app
+├── data/
+│   ├── model/          # @Entity (Habito, Conquista)
+│   ├── dao/            # @Dao (HabitoDao, ConquistaDao)
+│   └── AppDatabase.kt  # Singleton RoomDatabase
+├── navigation/         # Rotas.kt, AppNavigation.kt
+├── ui/
+│   ├── screens/        # Telas Compose (Home, Editar, Detalhes, etc.)
+│   ── viewmodel/      # HabitViewModel (estado reativo + chamadas ao banco)
+└── MainActivity.kt
 ```
 
-## Screenshots do App
+## Screenshots Persistência Funcionando
 
-### Home
-![Home](screenshots/home.jpg)
+### 1. Tela inicial
+![01](screenshots/persistencia_01.jpg)
 
-### Novo Hábito
-![Novo](screenshots/novo_habito.jpg)
+### 2. Adicionando novo hábito
+![02](screenshots/persistencia_02.JPG)
 
-### Detalhe Hábito
-![Detalhe](screenshots/detalhe_habito.jpg)
+### 3. Fechando o App
+![03](screenshots/persistencia_03.jpg)
 
-### Recompensas
-![Recompensas](screenshots/recompensas.jpg)
-
-### Detalhe Recompensas
-![Detalhes](screenshots/detalhe_recompensas.jpg)
-
-### Perfil
-![Perfil](screenshots/perfil.jpg)
-
-### Configurações
-![Configuracoes](screenshots/configuracoes.jpg)
-
-
-## Observações
-- Os dados vivem apenas em memória (`mutableStateListOf`). Ao fechar o app, as alterações são perdidas.
-- Persistência com Room/DataStore será implementada em trabalho futuro.
+### 4. Tela inicial reaberta
+![04](screenshots/persistencia_04.jpg)

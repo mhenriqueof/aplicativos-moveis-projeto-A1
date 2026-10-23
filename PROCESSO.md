@@ -1,80 +1,59 @@
-# Processo de Desenvolvimento - Trabalho 2
+# Processo de Desenvolvimento - Trabalho 3 (Persistência com Room)
 
 ## Integrante
-- Marcio Henrique
+- Henrique [Seu Sobrenome] - RA: [Seu RA]
 
-## Tema Escolhido
-**HabitTracker** - Aplicativo individual de rastreamento de hábitos diários com gamificação (conquistas).
+## Tema
+**HabitTracker** - Evolução do app de rastreamento de hábitos para suportar persistência de dados local via Room.
 
-## Decisões Técnicas
+## 1. Como estava no Trabalho 2 vs. O que mudou no Trabalho 3
 
-### 1. Arquitetura de Navegação
-Optei por usar **Navigation Compose** com `NavHost` centralizado no `AppNavigation.kt`, seguindo o padrão demonstrado na Aula 13 do professor. A `BottomNavigationBar` foi implementada com 3 abas principais (Home, Recompensas, Perfil), e telas secundárias (Novo Hábito, Detalhes, Configurações) são acessadas via navegação forward com botão de voltar (`popBackStack`).
+### Trabalho 2 (MAF)
+- Dados viviam em memória RAM usando `mutableStateListOf`.
+- Ao fechar o app, todos os hábitos e conquistas eram perdidos.
+- Telas recebiam objetos prontos via parâmetros de navegação.
 
-**Por quê?** Centralizar as rotas no objeto `Rotas.kt` evita erros de digitação e facilita a manutenção. A BottomBar com `currentBackStackEntryAsState` garante que o item ativo seja destacado corretamente.
+### Trabalho 3 (Room)
+- Dados agora sobrevivem ao fechamento do app usando SQLite via Room.
+- Substituímos `mutableStateListOf` por `MutableState<List<T>>` alimentado pelo banco.
+- Todas as operações de I/O são assíncronas (`suspend fun`) rodando em `Dispatchers.IO`.
+- A tela de detalhes busca o item diretamente do banco pelo ID (não recebe objeto pronto).
 
-### 2. Gerenciamento de Estado
-Usei um **ViewModel compartilhado** (`HabitViewModel`) com `mutableStateListOf` para manter as listas de hábitos e conquistas em memória. O ViewModel é criado no `AppNavigation` e passado como parâmetro para todas as telas.
+## 2. Estrutura do Room Criada
 
-**Por quê?** Dados precisam sobreviver à navegação entre telas (ex: adicionar hábito na tela "Novo Hábito" e ver na Home). `mutableStateListOf` garante recomposição automática do Compose quando a lista muda. Não usei banco de dados pois o escopo é apenas memória RAM.
+### Entities
+Criamos 2 entidades adaptadas das data classes originais:
+- **`Habito`**: Tabela `habitos`. Campos: `id` (PK auto), `nome`, `descricao`, `diasSemana` (String), `concluidoHoje`.
+- **`Conquista`**: Tabela `conquistas`. Campos: `id` (PK auto), `titulo`, `descricao`, `desbloqueada`, `icone`.
 
-### 3. Estrutura de Pacotes
-Organizei o código em:
-- `data/model/` → Data classes (`Habito`, `Conquista`)
-- `ui/screens/` → Telas Compose
-- `ui/viewmodel/` → HabitViewModel
-- `navigation/` → Rotas e AppNavigation
+> **Decisão técnica:** O campo `diasSemana` foi convertido de `Set<Int>` para `String` ("1,2,3") porque o Room não armazena coleções complexas nativamente sem TypeConverters. Optamos pela simplicidade de String para este escopo.
 
-**Por quê?** Separação clara de responsabilidades. Facilita encontrar arquivos e seguir o princípio de responsabilidade única.
+### DAOs
+Dois interfaces com CRUD completo (`@Insert`, `@Query`, `@Update`, `@Delete`):
+- **`HabitoDao`**: Inclui consulta extra `buscarPorId(id: Int)` para a tela de detalhes.
+- **`ConquistaDao`**: Mesma estrutura, garantindo consistência entre os dois CRUDs.
 
-### 4. Complexidade Extra (Tela de Detalhes do Hábito)
-Na `DetalheHabitoScreen`, implementei:
-- Cálculo da **taxa de conclusão global** (hábitos concluídos / total)
-- **Barra de progresso visual** (`LinearProgressIndicator`)
-- Formatação dos dias da semana em texto legível
-- Estatísticas combinadas de todos os hábitos
+### Database Singleton
+Classe `AppDatabase` seguindo o padrão oficial (Singleton com `@Volatile` + `synchronized`), expondo os dois DAOs. Nome do banco: `habittracker_database`.
 
-**Por quê?** Atende ao requisito: "pelo menos uma tela de Detalhes precisa fazer mais do que só reexibir os campos". Aqui combino dados da lista inteira + cálculo + componente visual extra.
+## 3. Dificuldades na Migração e Soluções
 
-## Evolução do Projeto
+### 3.1 Erro "Composable function call without Compose plugin"
+Ao adicionar o KSP para o Room, o IDE perdeu a referência ao plugin do Compose, gerando ~40 erros falsos positivos.
+**Solução:** Identificamos que era cache do IDE dessincronizado após troca de JDK. Usamos `Build > Compile` via terminal como fonte da verdade e invalidamos caches.
 
-### Fase 1: Setup Inicial
-- Criação do projeto Empty Compose Activity
-- Configuração de dependências (Navigation, ViewModel, Serialization)
-- Resolução de erros de build (AndroidX, cache incremental)
+### 3.2 Adaptação de Set<Int> para String
+O `NovoHabitoScreen` passava `Set<Int>` para o ViewModel, mas o Room esperava String.
+**Solução:** Centralizamos a conversão dentro do `ViewModel.adicionarHabito()` usando `joinToString(",")`. Na leitura, fazemos o split inverso. Isso manteve a UI limpa e isolou a lógica de persistência.
 
-### Fase 2: Navegação
-- Criação do sistema de rotas (`Rotas.kt`)
-- Implementação do `NavHost` + `BottomNavigationBar`
-- Criação de stubs das 7 telas para validar navegação
+### 3.3 Estado Reativo Assíncrono
+Trocar listas síncronas por chamadas de banco exigiu mudar de `mutableStateListOf` para `mutableStateOf<List<T>>` + `LaunchedEffect` nas telas de lista.
+**Solução:** Criamos funções `carregarHabitos()` e `carregarConquistas()` no ViewModel que rodam em `viewModelScope.launch(Dispatchers.IO)` e atualizam o estado na Main Thread.
 
-### Fase 3: Dados Dinâmicos
-- Criação das data classes `Habito` e `Conquista`
-- Implementação do `HabitViewModel` com listas reativas
-- Migração das telas para usar ViewModel em vez de estado local
+## 4. Prova de Persistência (Teste de Aceitação)
 
-### Fase 4: Funcionalidades MAF
-- `LazyColumn` nas telas de lista (Home e Recompensas)
-- Formulário funcional de adicionar hábito
-- Toggle de conclusão/desbloqueio
-- Telas de detalhe com passagem de ID via rota
-- Complexidade extra na tela de detalhe do hábito
-
-## Dificuldades Encontradas
-1. **Erros de build inicial**: Referências `libs.plugins` não resolvidas → Resolvido usando versões explícitas no `build.gradle.kts`.
-2. **Cache incremental corrompido**: Erros `Daemon compilation failed` → Resolvido com Clean + Rebuild + Invalidate Caches.
-3. **ExperimentalMaterial3Api**: Avisos no `TopAppBar` → Resolvido com flag global no `kotlinOptions`.
-
-## Lições Aprendidas
-- Navigation Compose exige planejamento prévio das rotas para evitar retrabalho.
-- ViewModel compartilhado é essencial para apps com múltiplas telas que compartilham dados.
-- `LazyColumn` é obrigatório para listas performáticas.
-- A complexidade extra na tela de detalhes é onde posso demonstrar entendimento além do básico.
-
-## Screenshots Comparativos do Progresso
-
-### Telas Antigas
-![Antigas](screenshots/telas_atingas.jpg)
-
-### Telas Novas
-![Novas](screenshots/telas_novas.jpg)
+## 5. Lições Aprendidas
+- Room exige disciplina com threads: esquecer `Dispatchers.IO` trava a UI instantaneamente.
+- O padrão Singleton do Database é crucial para evitar múltiplas instâncias do banco.
+- Migrar de memória para banco não muda a UX, mas transforma completamente a arquitetura interna.
+- Testar persistência real (fechar/reabrir) é diferente de testar funcionalidade em tempo de execução.

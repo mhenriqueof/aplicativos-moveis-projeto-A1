@@ -16,4 +16,12 @@ object Rotas {
     // Função auxiliar para montar a rota com o ID dinâmico
     fun detalheHabito(habitoId: Int) = "detalhe_habito/$habitoId"
     fun detalheConquista(conquistaId: Int) = "detalhe_conquista/$conquistaId"
+
+    const val EDITAR_HABITO = "editar_habito/{habitoId}"
+    fun editarHabito(habitoId: Int) = "editar_habito/$habitoId"
+
+    const val NOVA_CONQUISTA = "nova_conquista"
+
+    const val EDITAR_CONQUISTA = "editar_conquista/{conquistaId}"
+    fun editarConquista(conquistaId: Int) = "editar_conquista/$conquistaId"
 }

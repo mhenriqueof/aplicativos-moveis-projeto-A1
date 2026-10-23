@@ -1,94 +1,205 @@
 package com.example.habittracker.ui.viewmodel
 
-import androidx.compose.runtime.mutableStateListOf
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.habittracker.data.AppDatabase
+import com.example.habittracker.data.dao.ConquistaDao
+import com.example.habittracker.data.dao.HabitoDao
 import com.example.habittracker.data.model.Conquista
 import com.example.habittracker.data.model.Habito
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * ViewModel compartilhado entre todas as telas.
- * Mantém as listas de hábitos e conquistas em memória.
- * Sobrevive à navegação entre telas (mas não ao fechar o app - isso é Trabalho 3).
+ * Agora usa Room (banco SQLite) em vez de mutableStateListOf em memória.
+ * Os dados sobrevivem ao fechar o app.
  */
-class HabitViewModel : ViewModel() {
+class HabitViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Lista reativa de hábitos - usar mutableStateListOf para Compose recompor automaticamente
-    val habitos = mutableStateListOf(
-        Habito(1, "Beber 2L de água", setOf(1, 2, 3, 4, 5), descricao = "Manter hidratação durante o dia"),
-        Habito(2, "Ler 10 páginas", setOf(1, 2, 3, 4, 5, 6, 0), descricao = "Leitura diária antes de dormir"),
-        Habito(3, "Exercitar-se 20min", setOf(1, 3, 5), descricao = "Treino leve em casa"),
-        Habito(4, "Meditar 5min", setOf(1, 2, 3, 4, 5, 6, 0), descricao = "Meditação guiada pela manhã")
-    )
+    private val habitoDao: HabitoDao = AppDatabase.getDatabase(application).habitoDao()
+    private val conquistaDao: ConquistaDao = AppDatabase.getDatabase(application).conquistaDao()
 
-    // Lista reativa de conquistas
-    val conquistas = mutableStateListOf(
-        Conquista(1, "3 dias seguidos", "Complete hábitos por 3 dias consecutivos", true),
-        Conquista(2, "7 dias seguidos", "Complete hábitos por 7 dias consecutivos", true),
-        Conquista(3, "Madrugador", "Complete um hábito antes das 8h", true),
-        Conquista(4, "14 dias seguidos", "Complete hábitos por 14 dias consecutivos", false),
-        Conquista(5, "30 dias seguidos", "Complete hábitos por 30 dias consecutivos", false),
-        Conquista(6, "Perfeição semanal", "Complete todos os hábitos por 7 dias", false)
-    )
+    // Estado reativo das listas - atualizado quando o banco muda
+    val habitos = mutableStateOf<List<Habito>>(emptyList())
+    val conquistas = mutableStateOf<List<Conquista>>(emptyList())
 
-    // Próximo ID disponível para novos hábitos
-    private var proximoHabitoId = 5
-
-    // Próximo ID disponível para novas conquistas
-    private var proximoConquistaId = 7
+    init {
+        // Carrega os dados do banco assim que o ViewModel é criado
+        carregarHabitos()
+        carregarConquistas()
+    }
 
     // --- Funções para Hábitos ---
 
-    fun adicionarHabito(nome: String, diasSemana: Set<Int>, descricao: String) {
-        if (nome.isBlank()) return
-        habitos.add(
-            Habito(
-                id = proximoHabitoId++,
-                nome = nome,
-                diasSemana = diasSemana,
-                descricao = descricao
-            )
-        )
-    }
-
-    fun removerHabito(habito: Habito) {
-        habitos.remove(habito)
-    }
-
-    fun toggleHabitoConcluido(habitoId: Int) {
-        val index = habitos.indexOfFirst { it.id == habitoId }
-        if (index != -1) {
-            val habitoAtual = habitos[index]
-            habitos[index] = habitoAtual.copy(concluidoHoje = !habitoAtual.concluidoHoje)
+    fun carregarHabitos() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val lista = habitoDao.buscarTodos()
+                withContext(Dispatchers.Main) {
+                    habitos.value = lista
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    fun buscarHabitoPorId(id: Int): Habito? {
-        return habitos.find { it.id == id }
+    fun adicionarHabito(nome: String, diasSemana: Set<Int>, descricao: String) {
+        if (nome.isBlank()) return
+        // Converte Set<Int> para String "1,2,3" para salvar no Room
+        val diasString = diasSemana.sorted().joinToString(",")
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                habitoDao.inserir(
+                    Habito(
+                        nome = nome,
+                        descricao = descricao,
+                        diasSemana = diasString
+                    )
+                )
+                carregarHabitos() // Recarrega a lista após inserir
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun atualizarHabito(habito: Habito) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                habitoDao.atualizar(habito)
+                carregarHabitos()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun removerHabito(habito: Habito) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                habitoDao.deletar(habito)
+                carregarHabitos()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun toggleHabitoConcluido(habitoId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val habito = habitoDao.buscarPorId(habitoId) ?: return@launch
+                val atualizado = habito.copy(concluidoHoje = !habito.concluidoHoje)
+                habitoDao.atualizar(atualizado)
+                carregarHabitos()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    suspend fun buscarHabitoPorId(id: Int): Habito? {
+        return withContext(Dispatchers.IO) {
+            try {
+                habitoDao.buscarPorId(id)
+            } catch (e: Exception) {
+                null
+            }
+        }
     }
 
     // --- Funções para Conquistas ---
 
-    fun toggleConquistaDesbloqueada(conquistaId: Int) {
-        val index = conquistas.indexOfFirst { it.id == conquistaId }
-        if (index != -1) {
-            val conquistaAtual = conquistas[index]
-            conquistas[index] = conquistaAtual.copy(desbloqueada = !conquistaAtual.desbloqueada)
+    fun carregarConquistas() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val lista = conquistaDao.buscarTodos()
+                withContext(Dispatchers.Main) {
+                    conquistas.value = lista
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    fun buscarConquistaPorId(id: Int): Conquista? {
-        return conquistas.find { it.id == id }
+    fun toggleConquistaDesbloqueada(conquistaId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val conquista = conquistaDao.buscarPorId(conquistaId) ?: return@launch
+                val atualizada = conquista.copy(desbloqueada = !conquista.desbloqueada)
+                conquistaDao.atualizar(atualizada)
+                carregarConquistas()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    suspend fun buscarConquistaPorId(id: Int): Conquista? {
+        return withContext(Dispatchers.IO) {
+            try {
+                conquistaDao.buscarPorId(id)
+            } catch (e: Exception) {
+                null
+            }
+        }
     }
 
     // --- Estatísticas calculadas (complexidade extra para tela de detalhes) ---
 
     fun calcularTaxaConclusao(): Float {
-        if (habitos.isEmpty()) return 0f
-        val concluidos = habitos.count { it.concluidoHoje }
-        return concluidos.toFloat() / habitos.size.toFloat()
+        val lista = habitos.value
+        if (lista.isEmpty()) return 0f
+        val concluidos = lista.count { it.concluidoHoje }
+        return concluidos.toFloat() / lista.size.toFloat()
     }
 
     fun totalConquistasDesbloqueadas(): Int {
-        return conquistas.count { it.desbloqueada }
+        return conquistas.value.count { it.desbloqueada }
+    }
+
+    fun adicionarConquista(titulo: String, descricao: String) {
+        if (titulo.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                conquistaDao.inserir(
+                    Conquista(
+                        titulo = titulo,
+                        descricao = descricao
+                    )
+                )
+                carregarConquistas() // Recarrega a lista após inserir
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun removerConquista(conquista: Conquista) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                conquistaDao.deletar(conquista)
+                carregarConquistas()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun atualizarConquista(conquista: Conquista) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                conquistaDao.atualizar(conquista)
+                carregarConquistas()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }

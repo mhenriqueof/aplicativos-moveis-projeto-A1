@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -13,17 +15,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.habittracker.data.model.Conquista
 import com.example.habittracker.navigation.Rotas
 import com.example.habittracker.ui.viewmodel.HabitViewModel
+import androidx.compose.material.icons.filled.Add
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecompensasScreen(navController: NavController, viewModel: HabitViewModel) {
+    // Acessamos .value porque conquistas é State<List<Conquista>>
+    val listaConquistas = viewModel.conquistas.value
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -33,6 +38,13 @@ fun RecompensasScreen(navController: NavController, viewModel: HabitViewModel) {
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate(Rotas.NOVA_CONQUISTA) }
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Nova Conquista")
+            }
         }
     ) { padding ->
         Column(
@@ -42,21 +54,21 @@ fun RecompensasScreen(navController: NavController, viewModel: HabitViewModel) {
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = "${viewModel.totalConquistasDesbloqueadas()} de ${viewModel.conquistas.size} desbloqueadas",
+                text = "${viewModel.totalConquistasDesbloqueadas()} de ${listaConquistas.size} desbloqueadas",
                 fontSize = 14.sp,
                 color = Color(0xFF6B6B6B),
                 modifier = Modifier.padding(vertical = 12.dp)
             )
 
-            // LazyColumn exigido pelo Trabalho 2
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                items(viewModel.conquistas, key = { it.id }) { conquista ->
+                items(listaConquistas, key = { it.id }) { conquista ->
                     ConquistaCard(
                         conquista = conquista,
                         onToggleClick = { viewModel.toggleConquistaDesbloqueada(conquista.id) },
+                        onDeleteClick = { viewModel.removerConquista(conquista) },
                         onCardClick = { navController.navigate(Rotas.detalheConquista(conquista.id)) }
                     )
                 }
@@ -66,7 +78,12 @@ fun RecompensasScreen(navController: NavController, viewModel: HabitViewModel) {
 }
 
 @Composable
-fun ConquistaCard(conquista: Conquista, onToggleClick: () -> Unit, onCardClick: () -> Unit) {
+fun ConquistaCard(
+    conquista: Conquista,
+    onToggleClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onCardClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -112,7 +129,17 @@ fun ConquistaCard(conquista: Conquista, onToggleClick: () -> Unit, onCardClick: 
                 )
             }
 
-            // Botão para marcar/desmarcar conquista (requisito: remover/marcar)
+            // Botão de deletar (CRUD Delete)
+            IconButton(onClick = onDeleteClick) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Deletar Conquista",
+                    tint = Color(0xFFE53935)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
             TextButton(onClick = onToggleClick) {
                 Text(if (conquista.desbloqueada) "Desfazer" else "Marcar")
             }

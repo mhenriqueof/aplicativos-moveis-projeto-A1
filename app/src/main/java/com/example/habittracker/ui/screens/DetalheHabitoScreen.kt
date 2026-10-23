@@ -1,12 +1,11 @@
 package com.example.habittracker.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,12 +14,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.habittracker.data.model.Habito
 import com.example.habittracker.ui.viewmodel.HabitViewModel
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Edit
+import com.example.habittracker.navigation.Rotas
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel, habitoId: Int) {
-    val habito = viewModel.buscarHabitoPorId(habitoId)
+    // Estado local para o hábito buscado do banco
+    var habito by remember { mutableStateOf<Habito?>(null) }
+    var carregando by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    // Busca o hábito DIRETO DO BANCO pelo ID (requisito seção 3.3 do Trabalho 3)
+    LaunchedEffect(habitoId) {
+        habito = viewModel.buscarHabitoPorId(habitoId)
+        carregando = false
+    }
+
+    // Pegamos a lista atualizada para calcular estatísticas
+    val listaHabitos = viewModel.habitos.value
+    val taxaConclusao = if (listaHabitos.isEmpty()) 0f
+    else listaHabitos.count { it.concluidoHoje }.toFloat() / listaHabitos.size.toFloat()
 
     Scaffold(
         topBar = {
@@ -31,14 +48,33 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                         Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
                     }
                 },
+                actions = {
+                    // Botão de editar no canto direito do TopAppBar
+                    IconButton(onClick = {
+                        navController.navigate(Rotas.editarHabito(habitoId))
+                    }) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Editar",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
     ) { padding ->
-        if (habito == null) {
+        if (carregando) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (habito == null) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
@@ -46,6 +82,7 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                 Text("Hábito não encontrado", color = Color.Red)
             }
         } else {
+            val h = habito!!
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -57,50 +94,45 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (habito.concluidoHoje) Color(0xFFE8F5E9) else Color(0xFFF5F5F5)
+                        containerColor = if (h.concluidoHoje) Color(0xFFE8F5E9) else Color(0xFFF5F5F5)
                     )
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
+                        Text(text = h.nome, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = habito.nome,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (habito.concluidoHoje) "✅ Concluído hoje" else "⏳ Pendente hoje",
+                            text = if (h.concluidoHoje) "✅ Concluído hoje" else "⏳ Pendente hoje",
                             fontSize = 14.sp,
-                            color = if (habito.concluidoHoje) Color(0xFF2E7D32) else Color(0xFF6B6B6B),
+                            color = if (h.concluidoHoje) Color(0xFF2E7D32) else Color(0xFF6B6B6B),
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                 }
 
                 // Descrição
-                if (habito.descricao.isNotBlank()) {
+                if (h.descricao.isNotBlank()) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("Descrição", fontSize = 12.sp, color = Color(0xFF6B6B6B), fontWeight = FontWeight.Medium)
-                            Text(habito.descricao, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+                            Text(h.descricao, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
                 }
 
-                // --- COMPLEXIDADE EXTRA: Informações calculadas e combinadas ---
+                // --- COMPLEXIDADE EXTRA ---
 
-                // 1. Dias da semana formatados
+                // Dias da semana formatados (converte String "1,2,3" de volta para nomes)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Dias de repetição", fontSize = 12.sp, color = Color(0xFF6B6B6B), fontWeight = FontWeight.Medium)
                         Text(
-                            text = formatarDiasSemana(habito.diasSemana),
+                            text = formatarDiasSemana(h.diasSemana),
                             fontSize = 14.sp,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                 }
 
-                // 2. Taxa de conclusão global (combina dados de todos os hábitos)
-                val taxaConclusao = viewModel.calcularTaxaConclusao()
+                // Taxa de conclusão global
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
@@ -115,7 +147,7 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
-                            text = "${viewModel.habitos.count { it.concluidoHoje }} de ${viewModel.habitos.size} hábitos concluídos",
+                            text = "${listaHabitos.count { it.concluidoHoje }} de ${listaHabitos.size} hábitos concluídos",
                             fontSize = 12.sp,
                             color = Color(0xFF6B6B6B),
                             modifier = Modifier.padding(top = 2.dp)
@@ -123,7 +155,7 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     }
                 }
 
-                // 3. Progresso visual (complexidade extra visual)
+                // Barra de progresso
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Progresso do dia", fontSize = 12.sp, color = Color(0xFF6B6B6B), fontWeight = FontWeight.Medium)
@@ -142,13 +174,18 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Botão para toggle direto da tela de detalhes
                 Button(
-                    onClick = { viewModel.toggleHabitoConcluido(habito.id) },
+                    onClick = {
+                        scope.launch {
+                            viewModel.toggleHabitoConcluido(h.id)
+                            // Recarrega o hábito do banco após toggle
+                            habito = viewModel.buscarHabitoPorId(h.id)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) {
                     Text(
-                        if (habito.concluidoHoje) "Desmarcar Conclusão" else "Marcar como Concluído",
+                        if (h.concluidoHoje) "Desmarcar Conclusão" else "Marcar como Concluído",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -158,9 +195,13 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
     }
 }
 
-// Função auxiliar para formatar dias da semana
-private fun formatarDiasSemana(dias: Set<Int>): String {
-    if (dias.isEmpty()) return "Não definido"
+// Converte String "1,2,3" de volta para nomes dos dias
+private fun formatarDiasSemana(diasString: String): String {
+    if (diasString.isBlank()) return "Não definido"
     val nomes = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
-    return dias.sorted().mapNotNull { nomes.getOrNull(it) }.joinToString(", ")
+    return diasString.split(",")
+        .mapNotNull { it.trim().toIntOrNull() }
+        .sorted()
+        .mapNotNull { nomes.getOrNull(it) }
+        .joinToString(", ")
 }

@@ -15,6 +15,10 @@ import com.example.habittracker.ui.viewmodel.HabitViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PerfilScreen(navController: NavController, viewModel: HabitViewModel) {
+    // Acessamos .value porque agora são State<List<...>>
+    val listaHabitos = viewModel.habitos.value
+    val listaConquistas = viewModel.conquistas.value
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -45,9 +49,9 @@ fun PerfilScreen(navController: NavController, viewModel: HabitViewModel) {
                     Text("📊 Suas Estatísticas", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatItem("Hábitos", "${viewModel.habitos.size}")
-                        StatItem("Concluídos", "${viewModel.habitos.count { it.concluidoHoje }}")
-                        StatItem("Conquistas", "${viewModel.totalConquistasDesbloqueadas()}/${viewModel.conquistas.size}")
+                        StatItem("Hábitos", "${listaHabitos.size}")
+                        StatItem("Concluídos", "${listaHabitos.count { it.concluidoHoje }}")
+                        StatItem("Conquistas", "${viewModel.totalConquistasDesbloqueadas()}/${listaConquistas.size}")
                     }
                 }
             }

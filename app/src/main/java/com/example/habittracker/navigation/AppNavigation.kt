@@ -22,6 +22,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.habittracker.ui.screens.*
 import com.example.habittracker.ui.viewmodel.HabitViewModel
+import com.example.habittracker.ui.screens.EditarHabitoScreen
+import com.example.habittracker.ui.screens.NovaConquistaScreen
+import com.example.habittracker.ui.screens.EditarConquistaScreen
 
 @Composable
 fun AppNavigation() {
@@ -58,6 +61,15 @@ fun AppNavigation() {
             composable(Rotas.DETALHE_CONQUISTA) { backStackEntry ->
                 val conquistaId = backStackEntry.arguments?.getString("conquistaId")?.toIntOrNull() ?: 0
                 DetalheConquistaScreen(navController, viewModel, conquistaId)
+            }
+            composable(Rotas.EDITAR_HABITO) { backStackEntry ->
+                val habitoId = backStackEntry.arguments?.getString("habitoId")?.toIntOrNull() ?: 0
+                EditarHabitoScreen(navController, viewModel, habitoId)
+            }
+            composable(Rotas.NOVA_CONQUISTA) { NovaConquistaScreen(navController, viewModel) }
+            composable(Rotas.EDITAR_CONQUISTA) { backStackEntry ->
+                val conquistaId = backStackEntry.arguments?.getString("conquistaId")?.toIntOrNull() ?: 0
+                EditarConquistaScreen(navController, viewModel, conquistaId)
             }
         }
     }

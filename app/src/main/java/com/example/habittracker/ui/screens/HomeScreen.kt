@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,6 +26,9 @@ import com.example.habittracker.ui.viewmodel.HabitViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController, viewModel: HabitViewModel) {
+    // Agora acessamos .value porque habitos é State<List<Habito>>
+    val listaHabitos = viewModel.habitos.value
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -43,7 +47,6 @@ fun HomeScreen(navController: NavController, viewModel: HabitViewModel) {
             }
         }
     ) { padding ->
-        // LazyColumn exigido pelo Trabalho 2 (seção 3.2)
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -62,10 +65,11 @@ fun HomeScreen(navController: NavController, viewModel: HabitViewModel) {
                 )
             }
 
-            items(viewModel.habitos, key = { it.id }) { habito ->
+            items(listaHabitos, key = { it.id }) { habito ->
                 HabitoCard(
                     habito = habito,
                     onCheckClick = { viewModel.toggleHabitoConcluido(habito.id) },
+                    onDeleteClick = { viewModel.removerHabito(habito) },
                     onCardClick = { navController.navigate(Rotas.detalheHabito(habito.id)) }
                 )
             }
@@ -74,7 +78,12 @@ fun HomeScreen(navController: NavController, viewModel: HabitViewModel) {
 }
 
 @Composable
-fun HabitoCard(habito: Habito, onCheckClick: () -> Unit, onCardClick: () -> Unit) {
+fun HabitoCard(
+    habito: Habito,
+    onCheckClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onCardClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -87,8 +96,7 @@ fun HabitoCard(habito: Habito, onCheckClick: () -> Unit, onCardClick: () -> Unit
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -106,6 +114,17 @@ fun HabitoCard(habito: Habito, onCheckClick: () -> Unit, onCardClick: () -> Unit
                     )
                 }
             }
+
+            // Botão deletar (requisito CRUD - Delete)
+            IconButton(onClick = onDeleteClick) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Deletar",
+                    tint = Color(0xFFE53935)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
 
             Box(
                 modifier = Modifier

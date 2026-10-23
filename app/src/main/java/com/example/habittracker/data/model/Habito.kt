@@ -1,13 +1,19 @@
 package com.example.habittracker.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 /**
- * Data class representando um hábito.
- * Usada na lista principal e na tela de detalhes.
+ * Entity Room representando um hábito.
+ * Vira a tabela "habitos" no banco SQLite.
  */
+@Entity(tableName = "habitos")
 data class Habito(
-    val id: Int,
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+
     val nome: String,
-    val diasSemana: Set<Int> = emptySet(), // 0=Dom, 1=Seg, ... 6=Sab
-    var concluidoHoje: Boolean = false,
-    val descricao: String = ""
+    val descricao: String = "",
+    val diasSemana: String = "", // Room não salva Set<Int> direto — usamos String "1,2,3"
+    val concluidoHoje: Boolean = false
 )
