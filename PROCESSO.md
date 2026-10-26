@@ -1,7 +1,7 @@
 # Processo de Desenvolvimento - Trabalho 3 (Persistência com Room)
 
 ## Integrante
-- Henrique [Seu Sobrenome] - RA: [Seu RA]
+- Marcio Henrique
 
 ## Tema
 **HabitTracker** - Evolução do app de rastreamento de hábitos para suportar persistência de dados local via Room.
