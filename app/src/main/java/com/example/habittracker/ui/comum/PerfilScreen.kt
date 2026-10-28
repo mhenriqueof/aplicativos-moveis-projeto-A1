@@ -1,23 +1,44 @@
-package com.example.habittracker.ui.screens
+package com.example.habittracker.ui.comum
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.repository.ConquistaRepository
+import com.example.habittracker.data.repository.HabitoRepository
 import com.example.habittracker.navigation.Rotas
-import com.example.habittracker.ui.viewmodel.HabitViewModel
+import com.example.habittracker.ui.conquistas.ConquistaViewModel
+import com.example.habittracker.ui.conquistas.ConquistaViewModelFactory
+import com.example.habittracker.ui.habitos.HabitoViewModel
+import com.example.habittracker.ui.habitos.HabitoViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PerfilScreen(navController: NavController, viewModel: HabitViewModel) {
-    // Acessamos .value porque agora são State<List<...>>
-    val listaHabitos = viewModel.habitos.value
-    val listaConquistas = viewModel.conquistas.value
+fun PerfilScreen(
+    navController: NavController,
+    habitoViewModel: HabitoViewModel = viewModel(
+        factory = HabitoViewModelFactory(
+            HabitoRepository(AppDatabase.getDatabase(LocalContext.current).habitoDao())
+        )
+    ),
+    conquistaViewModel: ConquistaViewModel = viewModel(
+        factory = ConquistaViewModelFactory(
+            ConquistaRepository(AppDatabase.getDatabase(LocalContext.current).conquistaDao())
+        )
+    )
+) {
+    val habitoUiState by habitoViewModel.uiState.collectAsStateWithLifecycle()
+    val conquistaUiState by conquistaViewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -49,9 +70,9 @@ fun PerfilScreen(navController: NavController, viewModel: HabitViewModel) {
                     Text("📊 Suas Estatísticas", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatItem("Hábitos", "${listaHabitos.size}")
-                        StatItem("Concluídos", "${listaHabitos.count { it.concluidoHoje }}")
-                        StatItem("Conquistas", "${viewModel.totalConquistasDesbloqueadas()}/${listaConquistas.size}")
+                        StatItem("Hábitos", "${habitoUiState.listaDeHabitos.size}")
+                        StatItem("Concluídos", "${habitoUiState.listaDeHabitos.count { it.concluidoHoje }}")
+                        StatItem("Conquistas", "${conquistaViewModel.totalDesbloqueadas()}/${conquistaUiState.listaDeConquistas.size}")
                     }
                 }
             }

@@ -1,4 +1,4 @@
-package com.example.habittracker.ui.screens
+package com.example.habittracker.ui.habitos
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,23 +11,34 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.habittracker.data.model.Habito
+import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.local.Habito
+import com.example.habittracker.data.repository.HabitoRepository
 import com.example.habittracker.navigation.Rotas
-import com.example.habittracker.ui.viewmodel.HabitViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavController, viewModel: HabitViewModel) {
-    // Agora acessamos .value porque habitos é State<List<Habito>>
-    val listaHabitos = viewModel.habitos.value
+fun HomeScreen(
+    navController: NavController,
+    viewModel: HabitoViewModel = viewModel(
+        factory = HabitoViewModelFactory(
+            HabitoRepository(AppDatabase.getDatabase(LocalContext.current).habitoDao())
+        )
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -65,11 +76,11 @@ fun HomeScreen(navController: NavController, viewModel: HabitViewModel) {
                 )
             }
 
-            items(listaHabitos, key = { it.id }) { habito ->
+            items(uiState.listaDeHabitos, key = { it.id }) { habito ->
                 HabitoCard(
                     habito = habito,
-                    onCheckClick = { viewModel.toggleHabitoConcluido(habito.id) },
-                    onDeleteClick = { viewModel.removerHabito(habito) },
+                    onCheckClick = { viewModel.onToggleConcluido(habito.id) },
+                    onDeleteClick = { viewModel.onDelete(habito) },
                     onCardClick = { navController.navigate(Rotas.detalheHabito(habito.id)) }
                 )
             }
@@ -115,7 +126,6 @@ fun HabitoCard(
                 }
             }
 
-            // Botão deletar (requisito CRUD - Delete)
             IconButton(onClick = onDeleteClick) {
                 Icon(
                     Icons.Default.Delete,

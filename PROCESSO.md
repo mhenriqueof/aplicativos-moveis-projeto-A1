@@ -1,59 +1,101 @@
-# Processo de Desenvolvimento - Trabalho 3 (Persistência com Room)
+# Processo de Desenvolvimento — Evolução para MVVM (Trabalho 4)
 
 ## Integrante
 - Marcio Henrique
 
 ## Tema
-**HabitTracker** - Evolução do app de rastreamento de hábitos para suportar persistência de dados local via Room.
+**HabitTracker** — Refatoração completa da arquitetura para MVVM + Room Reativo.
 
-## 1. Como estava no Trabalho 2 vs. O que mudou no Trabalho 3
+## 1. Como estava no Trabalho 3 vs. O que mudou no Trabalho 4
 
-### Trabalho 2 (MAF)
-- Dados viviam em memória RAM usando `mutableStateListOf`.
-- Ao fechar o app, todos os hábitos e conquistas eram perdidos.
-- Telas recebiam objetos prontos via parâmetros de navegação.
+### Trabalho 3 (Room Básico)
+- Dados persistiam via Room, mas a UI acessava o DAO diretamente.
+- Estado da tela espalhado em múltiplas variáveis `remember` / `mutableStateOf`.
+- Um único `HabitViewModel` gigante cuidava de Hábitos E Conquistas.
+- Listas eram recarregadas manualmente após cada operação (`carregarHabitos()`).
+- Pacotes organizados por tipo (`data/model`, `data/dao`, `ui/screens`).
 
-### Trabalho 3 (Room)
-- Dados agora sobrevivem ao fechamento do app usando SQLite via Room.
-- Substituímos `mutableStateListOf` por `MutableState<List<T>>` alimentado pelo banco.
-- Todas as operações de I/O são assíncronas (`suspend fun`) rodando em `Dispatchers.IO`.
-- A tela de detalhes busca o item diretamente do banco pelo ID (não recebe objeto pronto).
+### Trabalho 4 (MVVM Completo)
+- Camada de Repository como única porta de entrada para dados.
+- DAOs retornam `Flow<List<T>>` — a lista se atualiza sozinha quando o banco muda.
+- Estado unificado em `UiState` (data class única por feature).
+- Separação em 2 ViewModels independentes: `HabitoViewModel` e `ConquistaViewModel`.
+- Telas "burras": só observam `uiState` e disparam eventos `onEvento()`.
+- Fluxo Unidirecional (UDF): estado desce, eventos sobem.
+- Pacotes organizados por feature (`ui/habitos`, `ui/conquistas`) + camadas (`data/local`, `data/repository`).
 
-## 2. Estrutura do Room Criada
+## 2. Estrutura Final do Projeto
 
-### Entities
-Criamos 2 entidades adaptadas das data classes originais:
-- **`Habito`**: Tabela `habitos`. Campos: `id` (PK auto), `nome`, `descricao`, `diasSemana` (String), `concluidoHoje`.
-- **`Conquista`**: Tabela `conquistas`. Campos: `id` (PK auto), `titulo`, `descricao`, `desbloqueada`, `icone`.
+Seguindo exatamente o padrão ensinado nas aulas de MVVM:
 
-> **Decisão técnica:** O campo `diasSemana` foi convertido de `Set<Int>` para `String` ("1,2,3") porque o Room não armazena coleções complexas nativamente sem TypeConverters. Optamos pela simplicidade de String para este escopo.
-
-### DAOs
-Dois interfaces com CRUD completo (`@Insert`, `@Query`, `@Update`, `@Delete`):
-- **`HabitoDao`**: Inclui consulta extra `buscarPorId(id: Int)` para a tela de detalhes.
-- **`ConquistaDao`**: Mesma estrutura, garantindo consistência entre os dois CRUDs.
-
-### Database Singleton
-Classe `AppDatabase` seguindo o padrão oficial (Singleton com `@Volatile` + `synchronized`), expondo os dois DAOs. Nome do banco: `habittracker_database`.
+```
+com.example.habittracker/
+├── MainActivity.kt              → Só cria NavController + BottomBar
+├── data/
+│   ├── local/                   → Entity + DAO + Database (Room)
+│   │   ├── Habito.kt            → @Entity(tableName = "habitos")
+│   │   ├── Conquista.kt         → @Entity(tableName = "conquistas")
+│   │   ├── HabitoDao.kt         → buscarTodos(): Flow<List<Habito>>
+│   │   ├── ConquistaDao.kt      → buscarTodos(): Flow<List<Conquista>>
+│   │   └── AppDatabase.kt       → Singleton RoomDatabase
+│   └── repository/              → Única fonte de verdade
+│       ├── HabitoRepository.kt  → getAllHabitos(), inserir(), atualizar(), deletar()
+│       └── ConquistaRepository.kt → getAllConquistas(), ...
+── ui/
+│   ├── habitos/                 → Feature completa de Hábitos
+│   │   ├── HabitoUiState.kt     → Lista + campos form + item em edição
+│   │   ├── HabitoViewModel.kt   → StateFlow + onNomeChange/onSave/onDelete
+│   │   ├── HabitoViewModelFactory.kt → Injeta HabitoRepository
+│   │   ├── HomeScreen.kt        → collectAsStateWithLifecycle()
+│   │   ├── NovoHabitoScreen.kt
+│   │   ├── EditarHabitoScreen.kt
+│   │   └── DetalheHabitoScreen.kt
+│   ├── conquistas/              → Feature completa de Conquistas
+│   │   ├── ConquistaUiState.kt
+│   │   ├── ConquistaViewModel.kt
+│   │   ├── ConquistaViewModelFactory.kt
+│   │   ├── RecompensasScreen.kt
+│   │   ├── NovaConquistaScreen.kt
+│   │   ├── EditarConquistaScreen.kt
+│   │   └── DetalheConquistaScreen.kt
+│   └── comum/                   → Telas compartilhadas
+│       ├── PerfilScreen.kt
+│       └── ConfiguracoesScreen.kt
+└── navigation/
+├── Rotas.kt
+└── AppNavigation.kt
+```
 
 ## 3. Dificuldades na Migração e Soluções
 
-### 3.1 Erro "Composable function call without Compose plugin"
-Ao adicionar o KSP para o Room, o IDE perdeu a referência ao plugin do Compose, gerando ~40 erros falsos positivos.
-**Solução:** Identificamos que era cache do IDE dessincronizado após troca de JDK. Usamos `Build > Compile` via terminal como fonte da verdade e invalidamos caches.
+### 3.1 Perda da BottomNavigationBar após refatoração
+Ao simplificar o `MainActivity.kt` durante a transição MVVM, a BottomBar sumiu porque foi removida junto com a lógica antiga.
+**Solução:** Restauramos o `Scaffold` com `NavigationBar` no `MainActivity`, usando `currentBackStackEntryAsState()` para esconder a barra em telas secundárias (detalhes, formulários). Renomeamos "Recompensas" para "Conquistas" para alinhar com a nomenclatura da feature.
 
-### 3.2 Adaptação de Set<Int> para String
-O `NovoHabitoScreen` passava `Set<Int>` para o ViewModel, mas o Room esperava String.
-**Solução:** Centralizamos a conversão dentro do `ViewModel.adicionarHabito()` usando `joinToString(",")`. Na leitura, fazemos o split inverso. Isso manteve a UI limpa e isolou a lógica de persistência.
+### 3.2 Adaptação de Set<Int> para String no Flow
+O `diasSemana` era `Set<Int>` na UI, mas o Room salva como String `"1,2,3"`. Com `Flow`, a conversão precisava acontecer dentro do `UiState` e não mais no ViewModel manual.
+**Solução:** Mantivemos a conversão `joinToString(",")` no `onSave()` e `split(",")` no `onEdit()`. O `Flow` garante que, após salvar, a lista reemitida já vem com o dado correto do banco, sem necessidade de recarregar manualmente.
 
-### 3.3 Estado Reativo Assíncrono
-Trocar listas síncronas por chamadas de banco exigiu mudar de `mutableStateListOf` para `mutableStateOf<List<T>>` + `LaunchedEffect` nas telas de lista.
-**Solução:** Criamos funções `carregarHabitos()` e `carregarConquistas()` no ViewModel que rodam em `viewModelScope.launch(Dispatchers.IO)` e atualizam o estado na Main Thread.
+### 3.3 Separação em 2 ViewModels
+O `HabitViewModel` antigo cuidava dos dois CRUDs. Separar exigiu duplicar a estrutura de Factory + UiState + ViewModel.
+**Solução:** Criamos `HabitoViewModel` e `ConquistaViewModel` independentes, cada um com seu próprio Repository e Factory. A `PerfilScreen` agora recebe ambos via parâmetros opcionais com `viewModel(factory = ...)`, mantendo a coesão alta e acoplamento baixo.
 
-## 4. Prova de Persistência (Teste de Aceitação)
+### 3.4 Tela "Burra" vs. Lógica de Negócio
+Antes, a `DetalheHabitoScreen` calculava taxa de conclusão e buscava dados sozinha.
+**Solução:** Movemos `calcularTaxaConclusao()` para o `HabitoViewModel`. A tela só lê `uiState.listaDeHabitos` e chama `viewModel.onToggleConcluido()`. Zero lógica de negócio no Composable.
+
+## 4. Prova de Funcionamento (Teste de Aceitação)
+
+### Roteiro Demonstrado
+1.  **Persistência Reativa:** Adicionei "Beber água" → fechei app → abri → item persistiu (via Room).
+2.  **Fluxo Unidirecional:** Editei o nome para "Beber 3L" → salvei → a lista atualizou sozinha (via Flow, sem recarregar manualmente).
+3.  **CRUD Completo:** Deletei uma conquista → fechei app → abri → conquista sumiu definitivamente.
+4.  **Navegação Correta:** BottomBar aparece nas telas principais (Home, Conquistas, Perfil) e some nas telas de detalhes/formulários.
+5.  **Separação de Responsabilidades:** Nenhuma tela acessa DAO ou Repository diretamente. Toda interação passa pelo ViewModel.
 
 ## 5. Lições Aprendidas
-- Room exige disciplina com threads: esquecer `Dispatchers.IO` trava a UI instantaneamente.
-- O padrão Singleton do Database é crucial para evitar múltiplas instâncias do banco.
-- Migrar de memória para banco não muda a UX, mas transforma completamente a arquitetura interna.
-- Testar persistência real (fechar/reabrir) é diferente de testar funcionalidade em tempo de execução.
+-   **Flow elimina recarregamentos manuais:** Uma vez inscrito no `init{}`, a lista nunca mais precisa ser "pedida".
+-   **UiState atômico previne bugs:** Ter um único objeto representando o estado da tela evita inconsistências entre variáveis soltas.
+-   **Repository desacopla o ViewModel do Room:** Se amanhã trocarmos SQLite por API, só o Repository muda.
+-   **MVVM não é sobre criar telas novas, é sobre organizar as existentes:** O comportamento visual do app é idêntico ao Trabalho 3, mas a manutenibilidade aumentou drasticamente.
+```

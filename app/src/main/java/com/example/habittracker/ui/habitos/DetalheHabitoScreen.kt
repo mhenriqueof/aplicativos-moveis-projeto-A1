@@ -1,43 +1,51 @@
-package com.example.habittracker.ui.screens
+package com.example.habittracker.ui.habitos
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.habittracker.data.model.Habito
-import com.example.habittracker.ui.viewmodel.HabitViewModel
-import kotlinx.coroutines.launch
-import androidx.compose.material.icons.filled.Edit
+import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.local.Habito
+import com.example.habittracker.data.repository.HabitoRepository
 import com.example.habittracker.navigation.Rotas
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel, habitoId: Int) {
-    // Estado local para o hábito buscado do banco
+fun DetalheHabitoScreen(
+    navController: NavController,
+    habitoId: Int,
+    viewModel: HabitoViewModel = viewModel(
+        factory = HabitoViewModelFactory(
+            HabitoRepository(AppDatabase.getDatabase(LocalContext.current).habitoDao())
+        )
+    )
+) {
     var habito by remember { mutableStateOf<Habito?>(null) }
     var carregando by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Busca o hábito DIRETO DO BANCO pelo ID (requisito seção 3.3 do Trabalho 3)
     LaunchedEffect(habitoId) {
-        habito = viewModel.buscarHabitoPorId(habitoId)
+        habito = viewModel.buscarPorId(habitoId)
         carregando = false
     }
 
-    // Pegamos a lista atualizada para calcular estatísticas
-    val listaHabitos = viewModel.habitos.value
-    val taxaConclusao = if (listaHabitos.isEmpty()) 0f
-    else listaHabitos.count { it.concluidoHoje }.toFloat() / listaHabitos.size.toFloat()
+    val taxaConclusao = viewModel.calcularTaxaConclusao()
 
     Scaffold(
         topBar = {
@@ -49,7 +57,6 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     }
                 },
                 actions = {
-                    // Botão de editar no canto direito do TopAppBar
                     IconButton(onClick = {
                         navController.navigate(Rotas.editarHabito(habitoId))
                     }) {
@@ -65,20 +72,14 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        },
+        }
     ) { padding ->
         if (carregando) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else if (habito == null) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("Hábito não encontrado", color = Color.Red)
             }
         } else {
@@ -90,7 +91,6 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Nome e status
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -108,7 +108,6 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     }
                 }
 
-                // Descrição
                 if (h.descricao.isNotBlank()) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -118,9 +117,6 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     }
                 }
 
-                // --- COMPLEXIDADE EXTRA ---
-
-                // Dias da semana formatados (converte String "1,2,3" de volta para nomes)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Dias de repetição", fontSize = 12.sp, color = Color(0xFF6B6B6B), fontWeight = FontWeight.Medium)
@@ -132,7 +128,6 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     }
                 }
 
-                // Taxa de conclusão global
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
@@ -147,7 +142,7 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
-                            text = "${listaHabitos.count { it.concluidoHoje }} de ${listaHabitos.size} hábitos concluídos",
+                            text = "${uiState.listaDeHabitos.count { it.concluidoHoje }} de ${uiState.listaDeHabitos.size} hábitos concluídos",
                             fontSize = 12.sp,
                             color = Color(0xFF6B6B6B),
                             modifier = Modifier.padding(top = 2.dp)
@@ -155,7 +150,6 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                     }
                 }
 
-                // Barra de progresso
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Progresso do dia", fontSize = 12.sp, color = Color(0xFF6B6B6B), fontWeight = FontWeight.Medium)
@@ -177,9 +171,8 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
                 Button(
                     onClick = {
                         scope.launch {
-                            viewModel.toggleHabitoConcluido(h.id)
-                            // Recarrega o hábito do banco após toggle
-                            habito = viewModel.buscarHabitoPorId(h.id)
+                            viewModel.onToggleConcluido(h.id)
+                            habito = viewModel.buscarPorId(h.id)
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp)
@@ -195,7 +188,6 @@ fun DetalheHabitoScreen(navController: NavController, viewModel: HabitViewModel,
     }
 }
 
-// Converte String "1,2,3" de volta para nomes dos dias
 private fun formatarDiasSemana(diasString: String): String {
     if (diasString.isBlank()) return "Não definido"
     val nomes = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")

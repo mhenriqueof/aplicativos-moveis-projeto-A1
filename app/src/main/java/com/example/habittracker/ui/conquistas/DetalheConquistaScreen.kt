@@ -1,37 +1,48 @@
-package com.example.habittracker.ui.screens
+package com.example.habittracker.ui.conquistas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.habittracker.data.model.Conquista
-import com.example.habittracker.ui.viewmodel.HabitViewModel
-import kotlinx.coroutines.launch
-import androidx.compose.material.icons.filled.Edit
+import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.local.Conquista
+import com.example.habittracker.data.repository.ConquistaRepository
 import com.example.habittracker.navigation.Rotas
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetalheConquistaScreen(navController: NavController, viewModel: HabitViewModel, conquistaId: Int) {
+fun DetalheConquistaScreen(
+    navController: NavController,
+    conquistaId: Int,
+    viewModel: ConquistaViewModel = viewModel(
+        factory = ConquistaViewModelFactory(
+            ConquistaRepository(AppDatabase.getDatabase(LocalContext.current).conquistaDao())
+        )
+    )
+) {
     var conquista by remember { mutableStateOf<Conquista?>(null) }
     var carregando by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
 
-    // Busca a conquista DIRETO DO BANCO pelo ID
     LaunchedEffect(conquistaId) {
-        conquista = viewModel.buscarConquistaPorId(conquistaId)
+        conquista = viewModel.buscarPorId(conquistaId)
         carregando = false
     }
 
@@ -60,20 +71,14 @@ fun DetalheConquistaScreen(navController: NavController, viewModel: HabitViewMod
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        },
+        }
     ) { padding ->
         if (carregando) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else if (conquista == null) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("Conquista não encontrada", color = Color.Red)
             }
         } else {
@@ -130,8 +135,8 @@ fun DetalheConquistaScreen(navController: NavController, viewModel: HabitViewMod
                 Button(
                     onClick = {
                         scope.launch {
-                            viewModel.toggleConquistaDesbloqueada(c.id)
-                            conquista = viewModel.buscarConquistaPorId(c.id)
+                            viewModel.onToggleDesbloqueada(c.id)
+                            conquista = viewModel.buscarPorId(c.id)
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp)

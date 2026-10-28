@@ -1,13 +1,9 @@
-package com.example.habittracker.data
+package com.example.habittracker.data.local
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.habittracker.data.dao.ConquistaDao
-import com.example.habittracker.data.dao.HabitoDao
-import com.example.habittracker.data.model.Conquista
-import com.example.habittracker.data.model.Habito
 
 /**
  * Database Room do app. Singleton.

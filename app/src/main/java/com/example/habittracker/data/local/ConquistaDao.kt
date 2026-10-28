@@ -1,16 +1,13 @@
-package com.example.habittracker.data.dao
+package com.example.habittracker.data.local
 
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import com.example.habittracker.data.model.Conquista
+import com.example.habittracker.data.local.Conquista
+import kotlinx.coroutines.flow.Flow
 
-/**
- * DAO para operações de CRUD na tabela "conquistas".
- * Todas as funções são suspend para rodar fora da thread principal.
- */
 @Dao
 interface ConquistaDao {
 
@@ -23,8 +20,9 @@ interface ConquistaDao {
     @Delete
     suspend fun deletar(conquista: Conquista)
 
+    // Agora retorna Flow
     @Query("SELECT * FROM conquistas ORDER BY id ASC")
-    suspend fun buscarTodos(): List<Conquista>
+    fun buscarTodos(): Flow<List<Conquista>>
 
     // Consulta extra filtrada por ID
     @Query("SELECT * FROM conquistas WHERE id = :id")

@@ -1,4 +1,4 @@
-package com.example.habittracker.ui.screens
+package com.example.habittracker.ui.habitos
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -8,7 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,24 +19,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.habittracker.ui.viewmodel.HabitViewModel
+import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.repository.HabitoRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NovoHabitoScreen(navController: NavController, viewModel: HabitViewModel) {
+fun NovoHabitoScreen(
+    navController: NavController,
+    viewModel: HabitoViewModel = viewModel(
+        factory = HabitoViewModelFactory(
+            HabitoRepository(AppDatabase.getDatabase(LocalContext.current).habitoDao())
+        )
+    )
+) {
     val context = LocalContext.current
-
-    var nomeHabito by remember { mutableStateOf("") }
-    var descricaoHabito by remember { mutableStateOf("") }
-    var diasSelecionados by remember { mutableStateOf(setOf<Int>()) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Novo Hábito", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = {
+                        viewModel.limparCampos()
+                        navController.popBackStack()
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
                     }
                 },
@@ -61,8 +72,8 @@ fun NovoHabitoScreen(navController: NavController, viewModel: HabitViewModel) {
             )
 
             OutlinedTextField(
-                value = nomeHabito,
-                onValueChange = { nomeHabito = it },
+                value = uiState.nome,
+                onValueChange = { viewModel.onNomeChange(it) },
                 placeholder = { Text("Ex: Beber água") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -77,8 +88,8 @@ fun NovoHabitoScreen(navController: NavController, viewModel: HabitViewModel) {
             )
 
             OutlinedTextField(
-                value = descricaoHabito,
-                onValueChange = { descricaoHabito = it },
+                value = uiState.descricao,
+                onValueChange = { viewModel.onDescricaoChange(it) },
                 placeholder = { Text("Ex: Manter hidratação durante o dia") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -93,25 +104,19 @@ fun NovoHabitoScreen(navController: NavController, viewModel: HabitViewModel) {
             )
 
             SeletorDiasDaSemana(
-                diasSelecionados = diasSelecionados,
-                onDiaClicado = { indiceDia ->
-                    diasSelecionados = if (diasSelecionados.contains(indiceDia)) {
-                        diasSelecionados - indiceDia
-                    } else {
-                        diasSelecionados + indiceDia
-                    }
-                }
+                diasSelecionados = uiState.diasSemana,
+                onDiaClicado = { viewModel.onDiaSemanaToggle(it) }
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = {
-                    if (nomeHabito.isBlank()) {
+                    if (uiState.nome.isBlank()) {
                         Toast.makeText(context, "Digite um nome para o hábito", Toast.LENGTH_SHORT).show()
                     } else {
-                        viewModel.adicionarHabito(nomeHabito, diasSelecionados, descricaoHabito)
-                        Toast.makeText(context, "Hábito \"$nomeHabito\" salvo!", Toast.LENGTH_SHORT).show()
+                        viewModel.onSave()
+                        Toast.makeText(context, "Hábito salvo!", Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     }
                 },
@@ -120,7 +125,7 @@ fun NovoHabitoScreen(navController: NavController, viewModel: HabitViewModel) {
                     .padding(bottom = 16.dp)
                     .height(50.dp)
             ) {
-                Text("Salvar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(uiState.textoBotao, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -129,7 +134,6 @@ fun NovoHabitoScreen(navController: NavController, viewModel: HabitViewModel) {
 @Composable
 fun SeletorDiasDaSemana(diasSelecionados: Set<Int>, onDiaClicado: (Int) -> Unit) {
     val letrasDosDias = listOf("D", "S", "T", "Q", "Q", "S", "S")
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween

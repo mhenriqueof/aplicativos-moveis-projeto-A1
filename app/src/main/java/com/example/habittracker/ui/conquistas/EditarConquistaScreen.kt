@@ -1,4 +1,4 @@
-package com.example.habittracker.ui.screens
+package com.example.habittracker.ui.conquistas
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -13,31 +13,32 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.habittracker.data.model.Conquista
-import com.example.habittracker.ui.viewmodel.HabitViewModel
+import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.repository.ConquistaRepository
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditarConquistaScreen(navController: NavController, viewModel: HabitViewModel, conquistaId: Int) {
+fun EditarConquistaScreen(
+    navController: NavController,
+    conquistaId: Int,
+    viewModel: ConquistaViewModel = viewModel(
+        factory = ConquistaViewModelFactory(
+            ConquistaRepository(AppDatabase.getDatabase(LocalContext.current).conquistaDao())
+        )
+    )
+) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var titulo by remember { mutableStateOf("") }
-    var descricao by remember { mutableStateOf("") }
-    var carregando by remember { mutableStateOf(true) }
-    var conquistaOriginal by remember { mutableStateOf<Conquista?>(null) }
-
-    // Busca a conquista original do banco ao abrir a tela
     LaunchedEffect(conquistaId) {
-        val c = viewModel.buscarConquistaPorId(conquistaId)
-        if (c != null) {
-            conquistaOriginal = c
-            titulo = c.titulo
-            descricao = c.descricao
+        val conquista = viewModel.buscarPorId(conquistaId)
+        if (conquista != null) {
+            viewModel.onEdit(conquista)
         }
-        carregando = false
     }
 
     Scaffold(
@@ -45,7 +46,10 @@ fun EditarConquistaScreen(navController: NavController, viewModel: HabitViewMode
             TopAppBar(
                 title = { Text("Editar Conquista", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = {
+                        viewModel.limparCampos()
+                        navController.popBackStack()
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
                     }
                 },
@@ -56,13 +60,9 @@ fun EditarConquistaScreen(navController: NavController, viewModel: HabitViewMode
             )
         }
     ) { padding ->
-        if (carregando) {
+        if (uiState.conquistaEmEdicao == null) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
-            }
-        } else if (conquistaOriginal == null) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Conquista não encontrada", color = Color.Red)
             }
         } else {
             Column(
@@ -80,8 +80,8 @@ fun EditarConquistaScreen(navController: NavController, viewModel: HabitViewMode
                 )
 
                 OutlinedTextField(
-                    value = titulo,
-                    onValueChange = { titulo = it },
+                    value = uiState.titulo,
+                    onValueChange = { viewModel.onTituloChange(it) },
                     placeholder = { Text("Ex: 7 dias seguidos") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -96,8 +96,8 @@ fun EditarConquistaScreen(navController: NavController, viewModel: HabitViewMode
                 )
 
                 OutlinedTextField(
-                    value = descricao,
-                    onValueChange = { descricao = it },
+                    value = uiState.descricao,
+                    onValueChange = { viewModel.onDescricaoChange(it) },
                     placeholder = { Text("Ex: Complete hábitos por 7 dias consecutivos") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
@@ -107,20 +107,12 @@ fun EditarConquistaScreen(navController: NavController, viewModel: HabitViewMode
 
                 Button(
                     onClick = {
-                        if (titulo.isBlank()) {
+                        if (uiState.titulo.isBlank()) {
                             Toast.makeText(context, "Digite um título para a conquista", Toast.LENGTH_SHORT).show()
                         } else {
-                            val c = conquistaOriginal!!
-                            // Cria cópia atualizada mantendo ID, desbloqueada e icone
-                            val atualizada = c.copy(
-                                titulo = titulo,
-                                descricao = descricao
-                            )
-                            scope.launch {
-                                viewModel.atualizarConquista(atualizada)
-                                Toast.makeText(context, "Conquista atualizada!", Toast.LENGTH_SHORT).show()
-                                navController.popBackStack()
-                            }
+                            viewModel.onSave()
+                            Toast.makeText(context, "Conquista atualizada!", Toast.LENGTH_SHORT).show()
+                            navController.popBackStack()
                         }
                     },
                     modifier = Modifier
@@ -128,7 +120,7 @@ fun EditarConquistaScreen(navController: NavController, viewModel: HabitViewMode
                         .padding(bottom = 16.dp)
                         .height(50.dp)
                 ) {
-                    Text("Salvar Alterações", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(uiState.textoBotao, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

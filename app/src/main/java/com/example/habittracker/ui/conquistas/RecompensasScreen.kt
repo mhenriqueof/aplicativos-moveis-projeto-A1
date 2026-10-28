@@ -1,4 +1,4 @@
-package com.example.habittracker.ui.screens
+package com.example.habittracker.ui.conquistas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,27 +7,38 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.habittracker.data.model.Conquista
+import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.local.Conquista
+import com.example.habittracker.data.repository.ConquistaRepository
 import com.example.habittracker.navigation.Rotas
-import com.example.habittracker.ui.viewmodel.HabitViewModel
-import androidx.compose.material.icons.filled.Add
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecompensasScreen(navController: NavController, viewModel: HabitViewModel) {
-    // Acessamos .value porque conquistas é State<List<Conquista>>
-    val listaConquistas = viewModel.conquistas.value
+fun RecompensasScreen(
+    navController: NavController,
+    viewModel: ConquistaViewModel = viewModel(
+        factory = ConquistaViewModelFactory(
+            ConquistaRepository(AppDatabase.getDatabase(LocalContext.current).conquistaDao())
+        )
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -54,7 +65,7 @@ fun RecompensasScreen(navController: NavController, viewModel: HabitViewModel) {
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = "${viewModel.totalConquistasDesbloqueadas()} de ${listaConquistas.size} desbloqueadas",
+                text = "${viewModel.totalDesbloqueadas()} de ${uiState.listaDeConquistas.size} desbloqueadas",
                 fontSize = 14.sp,
                 color = Color(0xFF6B6B6B),
                 modifier = Modifier.padding(vertical = 12.dp)
@@ -64,11 +75,11 @@ fun RecompensasScreen(navController: NavController, viewModel: HabitViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                items(listaConquistas, key = { it.id }) { conquista ->
+                items(uiState.listaDeConquistas, key = { it.id }) { conquista ->
                     ConquistaCard(
                         conquista = conquista,
-                        onToggleClick = { viewModel.toggleConquistaDesbloqueada(conquista.id) },
-                        onDeleteClick = { viewModel.removerConquista(conquista) },
+                        onToggleClick = { viewModel.onToggleDesbloqueada(conquista.id) },
+                        onDeleteClick = { viewModel.onDelete(conquista) },
                         onCardClick = { navController.navigate(Rotas.detalheConquista(conquista.id)) }
                     )
                 }
@@ -129,7 +140,6 @@ fun ConquistaCard(
                 )
             }
 
-            // Botão de deletar (CRUD Delete)
             IconButton(onClick = onDeleteClick) {
                 Icon(
                     Icons.Default.Delete,
