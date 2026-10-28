@@ -98,4 +98,3 @@ Antes, a `DetalheHabitoScreen` calculava taxa de conclusão e buscava dados sozi
 -   **UiState atômico previne bugs:** Ter um único objeto representando o estado da tela evita inconsistências entre variáveis soltas.
 -   **Repository desacopla o ViewModel do Room:** Se amanhã trocarmos SQLite por API, só o Repository muda.
 -   **MVVM não é sobre criar telas novas, é sobre organizar as existentes:** O comportamento visual do app é idêntico ao Trabalho 3, mas a manutenibilidade aumentou drasticamente.
-```
