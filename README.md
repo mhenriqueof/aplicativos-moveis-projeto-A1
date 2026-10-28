@@ -80,5 +80,3 @@ Veja o arquivo [PROCESSO.md](PROCESSO.md) para detalhes sobre:
 - Migração de Trabalho 3 (Room básico) para Trabalho 4 (MVVM completo)
 - Decisões técnicas (separação em 2 ViewModels, Flow vs suspend, UiState)
 - Dificuldades enfrentadas e soluções aplicadas
-- Prova de funcionamento com roteiro de teste
-- 
